@@ -88,7 +88,7 @@ public class DefaultResearchProvider extends AbstractResearchProvider
         effects.add(new ResearchEffect(MECHANIC_ENHANCED_GATES).setTranslatedName("Gates Gain +100% Raider Swarm Resistance").setLevels(new double[] {5, 15}));
         effects.add(new ResearchEffect(FARMING).setTranslatedName("Farmers Harvest +%3$s%% Crops").setLevels(new double[] {0.1, 0.25, 0.5, 0.75, 2}));
         effects.add(new ResearchEffect(FLEEING_DAMAGE).setTranslatedName("Guards Take -%3$s%% Damage When Fleeing").setLevels(new double[] {0.2, 0.3, 0.4, 0.75}));
-        effects.add(new ResearchEffect(FLEEING_SPEED).setTranslatedName("Fleeing Guards Gain Swiftness %2$s").setLevels(new double[] {1, 2, 3, 5}));
+        effects.add(new ResearchEffect(FLEEING_SPEED).setTranslatedName("Fleeing Guards Gain Swiftness %2$s").setLevels(new double[] {0, 1, 2, 3}));
         effects.add(new ResearchEffect(GROWTH).setTranslatedName("Child Growth Rate +%3$s%%").setLevels(new double[] {0.05, 0.1, 0.25, 0.5, 1}));
         effects.add(new ResearchEffect(HAPPINESS).setTranslatedName("Citizen Happiness +%3$s%%").setLevels(new double[] {0.05, 0.1, 0.15, 0.2, 0.5}));
         effects.add(new ResearchEffect(SATLIMIT).setTranslatedName("Healing Saturation Min %s").setLevels(new double[] {-0.5, -1, -1.5, -2, -5}));
@@ -169,7 +169,7 @@ public class DefaultResearchProvider extends AbstractResearchProvider
         effects.add(new ResearchEffect(ModBuildings.sifter.get().getBuildingBlock()).setTranslatedName("Unlocks Sifter's Hut").setLevels(new double[] {5}));
         effects.add(new ResearchEffect(ModBuildings.smeltery.get().getBuildingBlock()).setTranslatedName("Unlocks Smeltery").setLevels(new double[] {5}));
         effects.add(new ResearchEffect(ModBuildings.stoneMason.get().getBuildingBlock()).setTranslatedName("Unlocks Stonemason's Hut").setLevels(new double[] {5}));
-        effects.add(new ResearchEffect(ModBuildings.stoneSmelter.get().getBuildingBlock()).setTranslatedName("Unlocks Stone Smeltery").setLevels(new double[] {5}));
+        effects.add(new ResearchEffect(ModBuildings.stoneSmelter.get().getBuildingBlock()).setTranslatedName("Unlocks Brick Yard").setLevels(new double[] {5}));
         effects.add(new ResearchEffect(ModBuildings.netherWorker.get().getBuildingBlock()).setTranslatedName("Unlocks Nether Mine").setLevels(new double[] {5}));
         effects.add(new ResearchEffect(ModBuildings.alchemist.get().getBuildingBlock()).setTranslatedName("Unlocks Alchemist").setLevels(new double[] {5}));
 

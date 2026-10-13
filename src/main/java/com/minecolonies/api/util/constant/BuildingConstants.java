@@ -83,11 +83,6 @@ public final class BuildingConstants
     public static final String DEACTIVATED = "deactivated";
 
     /**
-     * String tag to identify a leisure decoration.
-     */
-    public static final String LEISURE = "leisure";
-
-    /**
      * Crafting module type.
      */
     public static final String MODULE_CRAFTING = "crafting";
@@ -106,6 +101,11 @@ public final class BuildingConstants
      * Custom crafting module type.
      */
     public static final String MODULE_CUSTOM = "custom";
+
+    /**
+     * Default level to allow building sorting.
+     */
+    public static final int DEFAULT_REQUIRED_SORT_LEVEL = 3;
 
     /**
      * Private constructor to hide implicit public one.

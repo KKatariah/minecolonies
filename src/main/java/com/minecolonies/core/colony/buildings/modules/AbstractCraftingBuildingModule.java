@@ -1,6 +1,5 @@
 package com.minecolonies.core.colony.buildings.modules;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.minecolonies.api.IMinecoloniesAPI;
 import com.minecolonies.api.MinecoloniesAPIProxy;
@@ -155,7 +154,15 @@ public abstract class AbstractCraftingBuildingModule extends AbstractBuildingMod
      */
     private int getActiveRecipes()
     {
-        return Math.max(0, recipes.size() - disabledRecipes.size());
+        // count up only active recipes that are *not* automatic
+        final HashSet<IToken<?>> activeRecipes = new HashSet<>(recipes);
+        disabledRecipes.forEach(activeRecipes::remove);
+        activeRecipes.removeIf(token ->
+        {
+            final IRecipeStorage storage = IColonyManager.getInstance().getRecipeManager().getRecipes().get(token);
+            return (storage == null || storage.getRecipeSource() != null);
+        });
+        return activeRecipes.size();
     }
 
     /**
@@ -321,7 +328,8 @@ public abstract class AbstractCraftingBuildingModule extends AbstractBuildingMod
 
         recipesDirty = false;
 
-        buf.writeInt(getMaxRecipes());
+        buf.writeVarInt(getActiveRecipes());
+        buf.writeVarInt(getMaxRecipes());
         buf.writeUtf(getId());
         buf.writeBoolean(isVisible());
     }
@@ -550,7 +558,7 @@ public abstract class AbstractCraftingBuildingModule extends AbstractBuildingMod
                 }
                 if(duplicateFound == null)
                 {
-                    addRecipeToList(recipeToken, true);
+                    addRecipeToList(recipeToken, false);
                     building.getColony().getRequestManager().onColonyUpdate(request -> request.getRequest() instanceof IDeliverable iDeliverable && iDeliverable.matches(recipeStorage.getPrimaryOutput()));
                     markDirty();
                 }
@@ -744,7 +752,7 @@ public abstract class AbstractCraftingBuildingModule extends AbstractBuildingMod
     protected int getWarehouseCount(ItemStorage item)
     {
         int count = 0;
-        final List<IWareHouse> wareHouses = building.getColony().getBuildingManager().getWareHouses();
+        final List<IWareHouse> wareHouses = building.getColony().getServerBuildingManager().getWareHouses();
 
         for(IWareHouse wareHouse: wareHouses)
         {
@@ -1067,34 +1075,6 @@ public abstract class AbstractCraftingBuildingModule extends AbstractBuildingMod
         public String getId()
         {
             return MODULE_SMELTING;
-        }
-
-        @Override
-        public IRecipeStorage getFirstFulfillableRecipe(final Predicate<ItemStack> stackPredicate, final int count, final boolean considerReservation)
-        {
-            boolean hasFuel = false;
-            final ImmutableList<ItemStorage> fuelList = building.getModule(BuildingModules.ITEMLIST_FUEL).getList();
-            for (final ItemStorage fuel : fuelList)
-            {
-                if (InventoryUtils.getCountFromBuilding(building, fuel) > 0)
-                {
-                    hasFuel = true;
-                    break;
-                }
-            }
-
-            if (!hasFuel)
-            {
-                for (final ItemStorage fuel : fuelList)
-                {
-                    if (stackPredicate.test(fuel.getItemStack()))
-                    {
-                        return super.getFirstFulfillableRecipe(stackPredicate, count, considerReservation);
-                    }
-                }
-                return null;
-            }
-            return super.getFirstFulfillableRecipe(stackPredicate, count, considerReservation);
         }
     }
 

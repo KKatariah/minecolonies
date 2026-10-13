@@ -17,7 +17,6 @@ import com.minecolonies.api.colony.buildings.modules.settings.ISettingKey;
 import com.minecolonies.api.colony.buildings.registry.BuildingEntry;
 import com.minecolonies.api.colony.interactionhandling.ChatPriority;
 import com.minecolonies.api.colony.jobs.registry.JobEntry;
-import com.minecolonies.api.colony.modules.ModuleContainerUtils;
 import com.minecolonies.api.colony.requestsystem.StandardFactoryController;
 import com.minecolonies.api.colony.requestsystem.data.IRequestSystemBuildingDataStore;
 import com.minecolonies.api.colony.requestsystem.location.ILocation;
@@ -50,7 +49,6 @@ import com.minecolonies.core.colony.jobs.AbstractJobCrafter;
 import com.minecolonies.core.colony.requestsystem.management.IStandardRequestManager;
 import com.minecolonies.core.colony.requestsystem.requesters.BuildingBasedRequester;
 import com.minecolonies.core.colony.requestsystem.requests.StandardRequests;
-import com.minecolonies.core.colony.requestsystem.resolvers.BuildingRequestResolver;
 import com.minecolonies.core.colony.workorders.WorkOrderBuilding;
 import com.minecolonies.core.entity.ai.workers.service.EntityAIWorkDeliveryman;
 import com.minecolonies.core.entity.ai.workers.util.ConstructionTapeHelper;
@@ -179,34 +177,23 @@ public abstract class AbstractBuilding extends AbstractBuildingContainer
     }
 
     @Override
-    public boolean hasModule(final Class<? extends IBuildingModule> clazz)
+    @NotNull
+    public List<IBuildingModule> getModules()
     {
-        return ModuleContainerUtils.hasModule(modules, clazz);
+        return modules;
+    }
+
+    @Override
+    @NotNull
+    public Class<IBuildingModule> getClassType()
+    {
+        return IBuildingModule.class;
     }
 
     @Override
     public boolean hasModule(final BuildingEntry.ModuleProducer<?, ?> producer)
     {
         return modulesMap.containsKey(producer.getRuntimeID());
-    }
-
-    @NotNull
-    @Override
-    public <T extends IBuildingModule> T getFirstModuleOccurance(final Class<T> clazz)
-    {
-        return ModuleContainerUtils.getFirstModuleOccurance(modules,
-          clazz,
-          "The module of class: " + clazz.toString() + "should never be null! Building: " + getBuildingType().getTranslationKey() + " pos:" + getID().toShortString());
-    }
-
-    @NotNull
-    @Override
-    public <T extends IBuildingModule> T getModuleMatching(final Class<T> clazz, final Predicate<? super T> modulePredicate)
-    {
-        return ModuleContainerUtils.getModuleMatching(modules,
-          clazz,
-          modulePredicate,
-          "no matching module for Building: " + getBuildingType().getTranslationKey() + " pos:" + getID().toShortString());
     }
 
     @Override
@@ -219,13 +206,6 @@ public abstract class AbstractBuilding extends AbstractBuildingContainer
     public IBuildingModule getModule(final int id)
     {
         return modulesMap.get(id);
-    }
-
-    @NotNull
-    @Override
-    public <T extends IBuildingModule> List<T> getModulesByType(final Class<T> clazz)
-    {
-        return ModuleContainerUtils.getModules(modules, clazz);
     }
 
     @Override
@@ -418,12 +398,12 @@ public abstract class AbstractBuilding extends AbstractBuildingContainer
     public void destroy()
     {
         onDestroyed();
-        colony.getBuildingManager().removeBuilding(this, colony.getPackageManager().getCloseSubscribers());
+        colony.getServerBuildingManager().removeBuilding(this, colony.getPackageManager().getCloseSubscribers());
         colony.getRequestManager().getDataStoreManager().remove(this.rsDataStoreToken);
 
         for (final BlockPos childpos : getChildren())
         {
-            final IBuilding building = colony.getBuildingManager().getBuilding(childpos);
+            final IBuilding building = colony.getServerBuildingManager().getBuilding(childpos);
             if (building != null)
             {
                 building.destroy();
@@ -488,21 +468,22 @@ public abstract class AbstractBuilding extends AbstractBuildingContainer
             return;
         }
 
+        final int min = colony.getWorld().getMinBuildHeight();
         final int max = colony.getWorld().getMaxBuildHeight();
         if (getCorners().getA().getY() >= max || getCorners().getB().getY() >= max)
         {
-            MessageUtils.format(BUILDER_BUILDING_TOO_HIGH).sendTo(colony).forAllPlayers();
+            MessageUtils.format(BUILDER_BUILDING_TOO_HIGH, max).sendTo(colony).forAllPlayers();
             return;
         }
-        else if (getPosition().getY() <= colony.getWorld().getMinBuildHeight())
+        else if (getPosition().getY() <= min)
         {
-            MessageUtils.format(BUILDER_BUILDING_TOO_LOW).sendTo(colony).forAllPlayers();
+            MessageUtils.format(BUILDER_BUILDING_TOO_LOW, min).sendTo(colony).forAllPlayers();
             return;
         }
 
         if (!builder.equals(BlockPos.ZERO))
         {
-            final IBuilding building = colony.getBuildingManager().getBuilding(builder);
+            final IBuilding building = colony.getServerBuildingManager().getBuilding(builder);
             if (building instanceof AbstractBuildingStructureBuilder &&
                   (building.getBuildingLevel() >= workOrder.getTargetLevel() || canBeBuiltByBuilder(workOrder.getTargetLevel())))
             {
@@ -558,7 +539,7 @@ public abstract class AbstractBuilding extends AbstractBuildingContainer
         dirty = true;
         if (colony != null)
         {
-            colony.getBuildingManager().markBuildingsDirty();
+            colony.getServerBuildingManager().markBuildingsDirty();
         }
     }
 
@@ -633,7 +614,7 @@ public abstract class AbstractBuilding extends AbstractBuildingContainer
                 markDirty();
 
                 final BlockPos buildingPos = o.getClaimedBy();
-                final IBuilding building = colony.getBuildingManager().getBuilding(buildingPos);
+                final IBuilding building = colony.getServerBuildingManager().getBuilding(buildingPos);
                 if (building != null)
                 {
                     for (final AbstractAssignedCitizenModule module : building.getModulesByType(AbstractAssignedCitizenModule.class))
@@ -768,7 +749,7 @@ public abstract class AbstractBuilding extends AbstractBuildingContainer
           .map(m -> (WorkOrderBuilding) m)
           .filter(f -> f.getLocation().equals(this.getID()) || this.getChildren().contains(f.getLocation()))
           .forEach(f -> {
-              IBuilding building = this.colony.getBuildingManager().getBuilding(f.getLocation());
+              IBuilding building = this.colony.getServerBuildingManager().getBuilding(f.getLocation());
               if (building != null)
               {
                   f.setCustomName(building);
@@ -812,7 +793,7 @@ public abstract class AbstractBuilding extends AbstractBuildingContainer
             return;
         }
 
-        final IBuilding parentBuilding = colony.getBuildingManager().getBuilding(getParent());
+        final IBuilding parentBuilding = colony.getServerBuildingManager().getBuilding(getParent());
 
         if (getBuildingLevel() == 0 && (parentBuilding == null || parentBuilding.getBuildingLevel() > 0))
         {
@@ -981,7 +962,7 @@ public abstract class AbstractBuilding extends AbstractBuildingContainer
 
         getModulesByType(IBuildingEventsModule.class).forEach(module -> module.onUpgradeComplete(newLevel));
         colony.getResearchManager().checkAutoStartResearch();
-        colony.getBuildingManager().onBuildingUpgradeComplete(this, newLevel);
+        colony.getServerBuildingManager().onBuildingUpgradeComplete(this, newLevel);
         cachedStandingPosition = null;
     }
 
@@ -1027,7 +1008,7 @@ public abstract class AbstractBuilding extends AbstractBuildingContainer
     {
         if (recheckGuardBuildingNear)
         {
-            guardBuildingNear = colony.getBuildingManager().hasGuardBuildingNear(this);
+            guardBuildingNear = colony.getServerBuildingManager().hasGuardBuildingNear(this);
             recheckGuardBuildingNear = false;
         }
         return guardBuildingNear;
@@ -1921,12 +1902,10 @@ public abstract class AbstractBuilding extends AbstractBuildingContainer
     public ImmutableCollection<IRequestResolver<?>> createResolvers()
     {
         final ImmutableList.Builder<IRequestResolver<?>> builder = ImmutableList.builder();
-
         for (final ICreatesResolversModule module : getModulesByType(ICreatesResolversModule.class))
         {
             builder.addAll(module.createResolvers());
         }
-        builder.add(new BuildingRequestResolver(getRequester().getLocation(), colony.getRequestManager().getFactoryController().getNewInstance(TypeConstants.ITOKEN)));
         return builder.build();
     }
 
@@ -1978,6 +1957,11 @@ public abstract class AbstractBuilding extends AbstractBuildingContainer
             colony.getRequestManager().updateRequestState(request.getId(), RequestState.RECEIVED);
         }
 
+        //Check if the citizen did not die.
+        if (colony.getCitizenManager().getCivilian(citizenThatRequested) != null)
+        {
+            colony.getCitizenManager().getCivilian(citizenThatRequested).onRequestCompleted(request.getId());
+        }
         markDirty();
     }
 

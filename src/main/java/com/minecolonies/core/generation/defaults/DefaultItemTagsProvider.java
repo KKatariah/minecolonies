@@ -188,6 +188,15 @@ public class DefaultItemTagsProvider extends ItemTagsProvider
           .add(Items.RABBIT)
           .add(Items.MUTTON);
 
+        tag(ModTags.feed)
+          .add(Items.WHEAT)
+          .add(ModBlocks.blockDurum.asItem())
+          .addTag(Tags.Items.CROPS_WHEAT);
+
+        tag(ModTags.leather)
+          .add(Items.SADDLE)
+          .add(Items.LEATHER);
+
         final Item[] paperExtras = getDomumExtra(ExtraBlockType.BASE_PAPER, ExtraBlockType.LIGHT_PAPER);
 
         tag(ModTags.crafterIngredient.get(TagConstants.CRAFTING_BAKER))
@@ -558,6 +567,7 @@ public class DefaultItemTagsProvider extends ItemTagsProvider
           .add(ModItems.cookieDough)
           .add(ModItems.rawPumpkinPie)
           .add(ModItems.cakeBatter)
+          .add(Items.BOOKSHELF)
           .addTags(Tags.Items.STONE, Tags.Items.COBBLESTONE)
           .addTags(Tags.Items.GRAVEL, Tags.Items.SAND)
           .addTags(Tags.Items.INGOTS, storageBlocks);

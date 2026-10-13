@@ -148,7 +148,7 @@ public class EntityAIWorkSmelter extends AbstractEntityAIUsesFurnace<JobSmelter,
     @Override
     protected IRequestable getSmeltAbleClass()
     {
-        return new SmeltableOre(STACKSIZE * building.getFirstModuleOccurance(FurnaceUserModule.class).getFurnaces().size());
+        return new SmeltableOre(STACKSIZE * building.getFirstModuleOccurance(FurnaceUserModule.class).getFurnaces().size(), building.getSetting(BuildingSmeltery.MIN).getValue());
     }
 
     @Override
@@ -199,8 +199,9 @@ public class EntityAIWorkSmelter extends AbstractEntityAIUsesFurnace<JobSmelter,
     @Override
     public void requestSmeltable()
     {
-        if (!building.hasWorkerOpenRequestsOfType(worker.getCitizenData().getId(), TypeToken.of(getSmeltAbleClass().getClass())) &&
-              !building.hasWorkerOpenRequestsFiltered(worker.getCitizenData().getId(),
+        if (InventoryUtils.hasBuildingEnoughElseCount(building, s -> new SmeltableOre(1).matches(s), 1) <= 0
+            && !building.hasWorkerOpenRequestsOfType(worker.getCitizenData().getId(), TypeToken.of(getSmeltAbleClass().getClass()))
+            && !building.hasWorkerOpenRequestsFiltered(worker.getCitizenData().getId(),
                 req -> req.getShortDisplayString().getSiblings().contains(Component.translatable(RequestSystemTranslationConstants.REQUESTS_TYPE_SMELTABLE_ORE))))
         {
             final List<ItemStorage> allowedItems = building.getModuleMatching(ItemListModule.class, m -> m.getId().equals(ORE_LIST)).getList();
@@ -229,7 +230,8 @@ public class EntityAIWorkSmelter extends AbstractEntityAIUsesFurnace<JobSmelter,
                       .createRequestAsync(new StackList(requests,
                         RequestSystemTranslationConstants.REQUESTS_TYPE_SMELTABLE_ORE,
                         STACKSIZE * building.getFirstModuleOccurance(FurnaceUserModule.class).getFurnaces().size(),
-                        1));
+                        1,
+                        building.getSetting(BuildingSmeltery.MIN).getValue()));
                 }
             }
         }

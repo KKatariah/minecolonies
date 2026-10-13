@@ -224,7 +224,7 @@ public abstract class AbstractEntityAIBasic<J extends AbstractJob<?, J>, B exten
             to resolve state.
            */
           new AIEventTarget(AIBlockingEventType.STATE_BLOCKING, this::inventoryNeedsDump, INVENTORY_FULL, 100),
-            new AITarget(INVENTORY_FULL, this::dumpInventory, 20),
+          new AITarget(INVENTORY_FULL, this::dumpInventory, 20),
           /*
             Check if any items are needed.
             If yes, transition to NEEDS_ITEM.
@@ -577,7 +577,7 @@ public abstract class AbstractEntityAIBasic<J extends AbstractJob<?, J>, B exten
                 }
                 catch (final Exception ex)
                 {
-                    Log.getLogger().warn("Resolver died for finished request. Oopsy. " + worker.getCitizenData().getName() + " witnessed it.");
+                    Log.getLogger().warn("Resolver died for finished request. Oopsy. " + worker.getCitizenData().getName() + " witnessed it.", ex);
                 }
                 final ILocation pickupLocation = resolver instanceof StationRequestResolver ? resolver.getLocation() : building.getLocation();
 
@@ -1485,7 +1485,7 @@ public abstract class AbstractEntityAIBasic<J extends AbstractJob<?, J>, B exten
      *
      * @see #incrementActionsDone(int)
      */
-    protected final void incrementActionsDone()
+    public final void incrementActionsDone()
     {
         job.incrementActionsDone();
     }
@@ -1690,7 +1690,7 @@ public abstract class AbstractEntityAIBasic<J extends AbstractJob<?, J>, B exten
         }
 
         final int invCount = InventoryUtils.getItemCountInItemHandler(worker.getInventoryCitizen(), s -> ItemStackUtils.compareItemStacksIgnoreStackSize(s, stack));
-        if (invCount >= count)
+        if (invCount >= minCount)
         {
             return true;
         }
@@ -1698,11 +1698,12 @@ public abstract class AbstractEntityAIBasic<J extends AbstractJob<?, J>, B exten
         final int updatedCount = count - invCount;
         final int updatedMinCount = Math.min(updatedCount, minCount);
 
+        // Check if in building and if we could transfer at least "mincount" over.
         if (InventoryUtils.hasBuildingEnoughElseCount(building, new ItemStorage(stack, true, matchNBT), updatedMinCount) >= updatedMinCount &&
-              InventoryUtils.transferXOfFirstSlotInProviderWithIntoNextFreeSlotInItemHandler(
+              updatedCount - InventoryUtils.transferXOfFirstSlotInProviderWithIntoNextFreeSlotInItemHandlerWithResult(
                 building, itemStack -> ItemStackUtils.compareItemStacksIgnoreStackSize(itemStack, stack, true, matchNBT),
                 updatedCount,
-                worker.getInventoryCitizen()))
+                worker.getInventoryCitizen()) >= minCount)
         {
             return true;
         }

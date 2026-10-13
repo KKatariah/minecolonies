@@ -5,28 +5,35 @@ import com.ldtteam.blockui.controls.Button;
 import com.ldtteam.blockui.controls.ButtonImage;
 import com.ldtteam.blockui.controls.ItemIcon;
 import com.ldtteam.blockui.controls.Text;
+import com.ldtteam.structurize.client.gui.WindowSelectRes;
 import com.minecolonies.api.colony.ICitizen;
+import com.minecolonies.api.colony.IColonyManager;
 import com.minecolonies.api.colony.IColonyView;
-import com.minecolonies.api.colony.buildings.views.IBuildingView;
 import com.minecolonies.api.colony.buildingextensions.IBuildingExtension;
 import com.minecolonies.api.colony.buildingextensions.registry.BuildingExtensionRegistries;
-import com.minecolonies.core.items.ItemCrop;
-import com.minecolonies.api.tileentities.AbstractTileEntityScarecrow;
+import com.minecolonies.api.colony.buildings.views.IBuildingView;
 import com.minecolonies.api.util.constant.Constants;
+import com.minecolonies.api.util.constant.TranslationConstants;
 import com.minecolonies.core.Network;
 import com.minecolonies.core.client.gui.AbstractWindowSkeleton;
-import com.minecolonies.core.client.gui.WindowSelectRes;
 import com.minecolonies.core.colony.buildingextensions.FarmField;
+import com.minecolonies.core.items.ItemCrop;
 import com.minecolonies.core.network.messages.server.colony.building.fields.FarmFieldPlotResizeMessage;
 import com.minecolonies.core.network.messages.server.colony.building.fields.FarmFieldUpdateSeedMessage;
+import com.minecolonies.core.tileentities.TileEntityScarecrow;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.resources.language.I18n;
 import net.minecraft.core.Direction;
+import net.minecraft.core.Holder;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.CropBlock;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
@@ -34,12 +41,16 @@ import net.minecraftforge.common.Tags;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.List;
 import java.util.Objects;
+import java.util.Arrays;
 import java.util.Optional;
 
+import static com.minecolonies.api.items.ModTags.cropBiomeTags;
 import static com.minecolonies.api.util.constant.TranslationConstants.*;
 import static com.minecolonies.api.util.constant.translation.GuiTranslationConstants.FIELD_GUI_ASSIGNED_FARMER;
 import static com.minecolonies.api.util.constant.translation.GuiTranslationConstants.FIELD_GUI_NO_ASSIGNED_FARMER;
+import static com.minecolonies.core.colony.buildingextensions.FarmField.MAX_RANGE;
 
 /**
  * Class which creates the GUI of our field inventory.
@@ -47,11 +58,6 @@ import static com.minecolonies.api.util.constant.translation.GuiTranslationConst
 @OnlyIn(Dist.CLIENT)
 public class WindowField extends AbstractWindowSkeleton
 {
-    /**
-     * The ID for the "not in colony" text.
-     */
-    private static final String NOT_IN_COLONY_TEXT_ID = "not-in-colony";
-
     /**
      * The prefix ID of the directional buttons.
      */
@@ -91,7 +97,7 @@ public class WindowField extends AbstractWindowSkeleton
      * The tile entity of the scarecrow.
      */
     @NotNull
-    private final AbstractTileEntityScarecrow tileEntityScarecrow;
+    private final TileEntityScarecrow tileEntityScarecrow;
 
     /**
      * The farm field instance.
@@ -104,7 +110,7 @@ public class WindowField extends AbstractWindowSkeleton
      *
      * @param tileEntityScarecrow the scarecrow tile entity.
      */
-    public WindowField(@NotNull AbstractTileEntityScarecrow tileEntityScarecrow)
+    public WindowField(@NotNull TileEntityScarecrow tileEntityScarecrow)
     {
         super(new ResourceLocation(Constants.MOD_ID, "gui/windowfield.xml"));
         this.tileEntityScarecrow = tileEntityScarecrow;
@@ -115,6 +121,27 @@ public class WindowField extends AbstractWindowSkeleton
             registerButton(DIRECTIONAL_BUTTON_ID_PREFIX + dir.getName(), this::onDirectionalButtonClick);
         }
 
+        final Holder<Biome> biomeHolder = Minecraft.getInstance().level.getBiome(tileEntityScarecrow.getBlockPos());
+        final ResourceLocation biomeID = biomeHolder.unwrapKey().get().location();
+        final String biomeLangKey = "biome." + biomeID.getNamespace() + "." + biomeID.getPath();
+        this.findPaneOfTypeByID("biome", Text.class)
+            .setText(Component.translatable("com.minecolonies.core.biome")
+                .append(I18n.exists(biomeLangKey) ? Component.translatable(biomeLangKey) : Component.literal(biomeID.getPath())));
+
+        MutableComponent biomecategory = Component.literal("");
+        for (final TagKey<Biome> preferredBiome : cropBiomeTags)
+        {
+            if (biomeHolder.is(preferredBiome))
+            {
+                if (!biomecategory.getSiblings().isEmpty())
+                {
+                    biomecategory.append(Component.literal(","));
+                }
+                biomecategory.append(Component.translatable(TranslationConstants.CROP_CLIMATE + "." + preferredBiome.location().getPath()));
+            }
+        }
+        this.findPaneOfTypeByID("climate", Text.class).setText(biomecategory);
+
         updateAll();
     }
 
@@ -123,13 +150,15 @@ public class WindowField extends AbstractWindowSkeleton
      */
     private void selectSeed()
     {
+        final Holder<Biome> biomeHolder = Minecraft.getInstance().level.getBiome(tileEntityScarecrow.getBlockPos());
         new WindowSelectRes(
-          this,
-          stack -> stack.is(Tags.Items.SEEDS)
-                     || (stack.getItem() instanceof BlockItem item && item.getBlock() instanceof CropBlock)
-                     || (stack.getItem() instanceof ItemCrop itemCrop && itemCrop.canBePlantedIn(Minecraft.getInstance().level.getBiome(tileEntityScarecrow.getBlockPos()))),
-          (stack, qty) -> setSeed(stack),
-          false).open();
+            this,
+            Component.translatable("com.minecolonies.coremod.gui.field.selectseed"),
+            farmField.getSeed(),
+            IColonyManager.getInstance().getCompatibilityManager().getListOfMatchingItems(stack -> stack.is(Tags.Items.SEEDS)
+                || (stack.getItem() instanceof BlockItem item && item.getBlock() instanceof CropBlock)
+                || (stack.getItem() instanceof ItemCrop itemCrop && itemCrop.canBePlantedIn(biomeHolder))),
+            (stack, qty) -> setSeed(stack)).open();
     }
 
     /**
@@ -139,7 +168,7 @@ public class WindowField extends AbstractWindowSkeleton
      */
     private void onDirectionalButtonClick(Button button)
     {
-        if (farmField == null || !button.isEnabled())
+        if (!button.isEnabled())
         {
             return;
         }
@@ -152,11 +181,16 @@ public class WindowField extends AbstractWindowSkeleton
             return;
         }
 
-        int newRadius = (farmField.getRadius(direction.get()) % farmField.getMaxRadius()) + 1;
-        farmField.setRadius(direction.get(), newRadius);
+        final int sum = Arrays.stream(tileEntityScarecrow.getFieldSize()).sum();
+        final int leftOver = MAX_RANGE - sum;
+
+        final int currentValue = tileEntityScarecrow.getFieldSize()[direction.get().get2DDataValue()];
+
+        int newRadius = (currentValue % Math.min(currentValue+leftOver, MAX_RANGE)) + 1;
+        tileEntityScarecrow.setFieldSize(direction.get(), newRadius);
         button.setText(Component.literal(String.valueOf(newRadius)));
 
-        Network.getNetwork().sendToServer(new FarmFieldPlotResizeMessage(tileEntityScarecrow.getCurrentColony(), newRadius, direction.get(), farmField.getPosition()));
+        Network.getNetwork().sendToServer(new FarmFieldPlotResizeMessage(newRadius, direction.get(), tileEntityScarecrow.getBlockPos()));
     }
 
     private void updateAll()
@@ -200,9 +234,10 @@ public class WindowField extends AbstractWindowSkeleton
             return;
         }
 
-        final IBuildingExtension field = colonyView.getBuildingExtension(otherField -> otherField.getBuildingExtensionType().equals(BuildingExtensionRegistries.farmField.get()) && otherField.getPosition()
-                                                                                                                                      .equals(tileEntityScarecrow.getBlockPos()));
-        if (field instanceof FarmField farmFieldFound)
+        final @NotNull List<IBuildingExtension> fields = colonyView.getClientBuildingManager()
+            .getBuildingExtensions(otherField -> otherField.getBuildingExtensionType().equals(BuildingExtensionRegistries.farmField.get()) && otherField.getPosition()
+                .equals(tileEntityScarecrow.getBlockPos()));
+        if (!fields.isEmpty() && fields.get(0) instanceof FarmField farmFieldFound)
         {
             farmField = farmFieldFound;
         }
@@ -215,16 +250,10 @@ public class WindowField extends AbstractWindowSkeleton
     {
         IColonyView colonyView = getCurrentColony();
 
-        findPaneOfTypeByID(NOT_IN_COLONY_TEXT_ID, Text.class).setVisible(colonyView == null);
         findPaneOfTypeByID(CURRENT_FARMER_TEXT_ID, Text.class).setVisible(colonyView != null);
         findPaneOfTypeByID(SELECT_SEED_BUTTON_ID, ButtonImage.class).setVisible(colonyView != null);
         findPaneOfTypeByID(CURRENT_SEED_TEXT_ID, ItemIcon.class).setVisible(colonyView != null);
         findPaneOfTypeByID(DIRECTIONAL_BUTTON_CENTER_ICON_ID, ItemIcon.class).setVisible(colonyView != null);
-
-        for (Direction dir : Direction.Plane.HORIZONTAL)
-        {
-            findPaneOfTypeByID(DIRECTIONAL_BUTTON_ID_PREFIX + dir.getName(), ButtonImage.class).setVisible(colonyView != null);
-        }
     }
 
     /**
@@ -240,7 +269,7 @@ public class WindowField extends AbstractWindowSkeleton
             return;
         }
 
-        final IBuildingView building = colonyView.getBuilding(farmField.getBuildingId());
+        final IBuildingView building = colonyView.getClientBuildingManager().getBuilding(farmField.getBuildingId());
         if (building == null)
         {
             return;
@@ -280,7 +309,7 @@ public class WindowField extends AbstractWindowSkeleton
         for (Direction dir : Direction.Plane.HORIZONTAL)
         {
             ButtonImage button = findPaneOfTypeByID(DIRECTIONAL_BUTTON_ID_PREFIX + dir.getName(), ButtonImage.class);
-            button.setEnabled(!Objects.isNull(farmField));
+            button.setText(Component.literal(Integer.toString(tileEntityScarecrow.getFieldSize()[dir.get2DDataValue()])));
 
             int buttonState = 1;
             if (!button.isEnabled())
@@ -293,8 +322,6 @@ public class WindowField extends AbstractWindowSkeleton
             }
 
             button.setImage(TEXTURE, dir.get2DDataValue() * BUTTON_SIZE, buttonState * BUTTON_SIZE, BUTTON_SIZE, BUTTON_SIZE);
-            button.setText(Component.literal(String.valueOf(Objects.isNull(farmField) ? "" : farmField.getRadius(dir))));
-
             PaneBuilders.tooltipBuilder()
               .hoverPane(button)
               .append(Component.translatable(PARTIAL_BLOCK_HUT_FIELD_DIRECTION_ABSOLUTE + dir.getSerializedName()))

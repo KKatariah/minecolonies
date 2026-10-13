@@ -357,6 +357,21 @@ public final class WindowConstants
     public static final String BUTTON_ADD_PLAYER_OR_FAKEPLAYER = "addfakeplayer";
 
     /**
+     * The button to select an online player
+     */
+    public static final String BUTTON_OPEN_ONLINE_PLAYER_LIST = "addOnlinePlayer";
+
+    /**
+     * The list to select online players from
+     */
+    public static final String LIST_SELECT_PLAYER = "playerPicker";
+
+    /**
+     * Button to select a player from the player list
+     */
+    public static final String BUTTON_SELECT_PLAYER_LIST = "playerSelectButton";
+
+    /**
      * The view of the permission management.
      */
     public static final String PERMISSION_VIEW = "managePermissions";
@@ -540,6 +555,7 @@ public final class WindowConstants
     public static final String BUTTON_PREVPAGE     = "prevPage";
     public static final String BUTTON_NEXTPAGE     = "nextPage";
     public static final String LABEL_NO_UPGRADE    = "infotextnoupgrade";
+    public static final String UNI_INV_RESEARCH    = "invresearch";
 
     /**
      * The GuardTower GUI file.
@@ -586,7 +602,7 @@ public final class WindowConstants
     /**
      * Id of the resource add button.
      */
-    public static final String REQUEST_FULLFIL = "fulfill";
+    public static final String REQUEST_FULFILL = "fulfill";
 
     /**
      * Id of the resource add button.
@@ -842,11 +858,6 @@ public final class WindowConstants
     public static final String WINDOW_ID_LIST_REQUESTS = "requests";
 
     /**
-     * Requests box id.
-     */
-    public static final String WINDOW_ID_REQUEST_BOX = "requestx";
-
-    /**
      * Requestst stack id.
      */
     public static final String LIST_ELEMENT_ID_REQUEST_STACK = "requestStack";
@@ -1096,7 +1107,6 @@ public final class WindowConstants
     public static final String TOWNHALL_PERM_LIST         = "permissionsList";
     public static final String TOWNHALL_PERM_SETTINGS     = "permissionsSettings";
     public static final String TOWNHALL_PERM_MODE_TOGGLE  = "permissionsModeToggle";
-    public static final String TOWNHALL_BUTTON_SUBSCRIBER = "setSubscriber";
     public static final String TOWNHALL_RANK_TYPE_PICKER  = "rankTypePicker";
 
     /**

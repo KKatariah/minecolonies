@@ -94,13 +94,13 @@ public class RaiderWalkAI implements IStateAI
 
                 if (raider.getNavigation().getPathResult() != null)
                 {
-                    raider.getNavigation().getPathResult().getJob().getPathingOptions().withCanEnterDoors(true).withToggleCost(0).withNonLadderClimbableCost(0);
+                    raider.getNavigation().getPathResult().getJob().getPathingOptions().withCanEnterDoors(true).withCanEnterGates(true).withToggleCost(0).withNonLadderClimbableCost(0);
                 }
             }
             else if (raider.blockPosition().distSqr(targetBlock) < 25)
             {
                 walkTimer = raider.level.getGameTime() + TICKS_SECOND * 30;
-                walkInBuilding = raider.getColony().getBuildingManager().getBuilding(targetBlock);
+                walkInBuilding = raider.getColony().getServerBuildingManager().getBuilding(targetBlock);
             }
             else if (raider.getNavigation().isDone())
             {

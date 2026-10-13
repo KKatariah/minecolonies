@@ -9,7 +9,7 @@ import com.minecolonies.api.crafting.IRecipeStorage;
 import com.minecolonies.api.crafting.registry.CraftingType;
 import com.minecolonies.api.util.constant.Constants;
 import com.minecolonies.core.Network;
-import com.minecolonies.core.client.gui.modules.WindowListRecipes;
+import com.minecolonies.core.client.gui.modules.building.WindowListRecipes;
 import com.minecolonies.core.colony.buildings.views.AbstractBuildingView;
 import com.minecolonies.core.network.messages.server.colony.building.OpenCraftingGUIMessage;
 import net.minecraft.client.Minecraft;
@@ -57,6 +57,11 @@ public class CraftingModuleView extends AbstractBuildingModuleView
      * The list of disabled recipes.
      */
     protected final List<IRecipeStorage> disabledRecipes = new ArrayList<>();
+
+    /**
+     * The active recipes.
+     */
+    private int activeRecipes;
 
     /**
      * The max recipes.
@@ -117,7 +122,8 @@ public class CraftingModuleView extends AbstractBuildingModuleView
             }
         }
 
-        this.maxRecipes = buf.readInt();
+        this.activeRecipes = buf.readVarInt();
+        this.maxRecipes = buf.readVarInt();
         this.id = buf.readUtf(32767);
         this.isVisible = buf.readBoolean();
     }
@@ -210,7 +216,11 @@ public class CraftingModuleView extends AbstractBuildingModuleView
      */
     public void removeRecipe(int index)
     {
-        recipes.remove(index);
+        final IRecipeStorage doomed = recipes.remove(index);
+        if (doomed.getRecipeSource() == null && !disabledRecipes.contains(doomed))
+        {
+            --activeRecipes;
+        }
     }
 
     /**
@@ -241,7 +251,7 @@ public class CraftingModuleView extends AbstractBuildingModuleView
 
     public int getActiveRecipes()
     {
-        return Math.max(0, recipes.size() - disabledRecipes.size());
+        return activeRecipes;
     }
 
     public int getMaxRecipes()
@@ -266,10 +276,18 @@ public class CraftingModuleView extends AbstractBuildingModuleView
         if (disabledRecipes.contains(storage))
         {
             disabledRecipes.remove(storage);
+            if (storage.getRecipeSource() == null)
+            {
+                ++activeRecipes;
+            }
         }
         else
         {
             disabledRecipes.add(storage);
+            if (storage.getRecipeSource() == null)
+            {
+                --activeRecipes;
+            }
         }
     }
 

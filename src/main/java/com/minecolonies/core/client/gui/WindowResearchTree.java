@@ -10,8 +10,8 @@ import com.minecolonies.api.colony.buildings.registry.IBuildingRegistry;
 import com.minecolonies.api.colony.buildings.views.IBuildingView;
 import com.minecolonies.api.crafting.ItemStorage;
 import com.minecolonies.api.research.*;
-import com.minecolonies.api.research.IResearchCost;
-import com.minecolonies.api.research.IResearchEffect;
+import com.minecolonies.api.research.requirements.BuildingAlternatesResearchRequirement;
+import com.minecolonies.api.research.requirements.BuildingResearchRequirement;
 import com.minecolonies.api.research.util.ResearchState;
 import com.minecolonies.api.util.InventoryUtils;
 import com.minecolonies.api.util.ItemStackUtils;
@@ -19,10 +19,8 @@ import com.minecolonies.api.util.Log;
 import com.minecolonies.api.util.constant.Constants;
 import com.minecolonies.core.Network;
 import com.minecolonies.core.client.gui.blockui.RotatingItemIcon;
-import com.minecolonies.core.client.gui.modules.UniversityModuleWindow;
+import com.minecolonies.core.client.gui.modules.building.UniversityModuleWindow;
 import com.minecolonies.core.network.messages.server.colony.building.university.TryResearchMessage;
-import com.minecolonies.api.research.requirements.BuildingAlternatesResearchRequirement;
-import com.minecolonies.api.research.requirements.BuildingResearchRequirement;
 import com.minecolonies.core.research.GlobalResearchEffect;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
@@ -203,7 +201,7 @@ public class WindowResearchTree extends AbstractWindowSkeleton
             final IGlobalResearch research = IGlobalResearchTree.getInstance().getResearch(branch, new ResourceLocation(button.getID()));
             final ILocalResearch localResearch = building.getColony().getResearchManager().getResearchTree().getResearch(branch, research.getId());
             if (localResearch == null && building.getBuildingLevel() > building.getColony().getResearchManager().getResearchTree().getResearchInProgress().size() &&
-                  (research.hasEnoughResources(new InvWrapper(Minecraft.getInstance().player.getInventory())) || (mc.player.isCreative())))
+                  (research.hasEnoughResources(Minecraft.getInstance().player, building.getPosition())) || (mc.player.isCreative()))
             {
                 // This side won't actually start research; it'll be overridden the next colony update from the server.
                 // It will, however, update for the next WindowResearchTree if the colony update is slow to come back.
@@ -411,7 +409,7 @@ public class WindowResearchTree extends AbstractWindowSkeleton
             return ResearchButtonState.MISSING_REQUIREMENT;
         }
         // has everything but the item cost requirements.
-        else if (!research.hasEnoughResources(new InvWrapper(Minecraft.getInstance().player.getInventory())))
+        else if (!research.hasEnoughResources(Minecraft.getInstance().player, building.getPosition()))
         {
             return ResearchButtonState.MISSING_COST;
         }
@@ -652,7 +650,7 @@ public class WindowResearchTree extends AbstractWindowSkeleton
                 hoverPaneBuilder.paragraphBreak()
                   .append(Component.literal(" - "))
                   .append(Component.translatable("com.minecolonies.coremod.research.limit.requirement", cost.getCount(), cost.getTranslatedName()));
-                if (research.hasEnoughResources(new InvWrapper(Minecraft.getInstance().player.getInventory())))
+                if (research.hasEnoughResources(Minecraft.getInstance().player, building.getPosition()))
                 {
                     hoverPaneBuilder.color(COLOR_TEXT_FULFILLED);
                 }

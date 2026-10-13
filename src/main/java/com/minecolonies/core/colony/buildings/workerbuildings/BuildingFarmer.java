@@ -15,7 +15,7 @@ import com.minecolonies.api.util.CraftingUtils;
 import com.minecolonies.api.util.ItemStackUtils;
 import com.minecolonies.api.util.OptionalPredicate;
 import com.minecolonies.core.blocks.MinecoloniesCropBlock;
-import com.minecolonies.core.client.gui.modules.FarmFieldsModuleWindow;
+import com.minecolonies.core.client.gui.modules.building.FarmFieldsModuleWindow;
 import com.minecolonies.core.colony.buildingextensions.FarmField;
 import com.minecolonies.core.colony.buildings.AbstractBuilding;
 import com.minecolonies.core.colony.buildings.modules.AbstractCraftingBuildingModule;
@@ -292,7 +292,7 @@ public class BuildingFarmer extends AbstractBuilding
         @Override
         public @NotNull List<IBuildingExtension> getMatchingExtension(final Predicate<IBuildingExtension> predicateToMatch)
         {
-            return building.getColony().getBuildingManager().getBuildingExtensions(field -> field.getBuildingExtensionType() == BuildingExtensionRegistries.farmField.get() && predicateToMatch.test(field));
+            return building.getColony().getServerBuildingManager().getBuildingExtensions(field -> field.getBuildingExtensionType() == BuildingExtensionRegistries.farmField.get() && predicateToMatch.test(field));
         }
 
         @Override
@@ -323,7 +323,7 @@ public class BuildingFarmer extends AbstractBuilding
         @Override
         protected List<IBuildingExtension> getFieldsInColony()
         {
-            return getColony().getBuildingExtensions(field -> field.getBuildingExtensionType().equals(BuildingExtensionRegistries.farmField.get()));
+            return getColony().getClientBuildingManager().getBuildingExtensions(field -> field.getBuildingExtensionType().equals(BuildingExtensionRegistries.farmField.get()));
         }
 
         @Override

@@ -3,12 +3,14 @@ package com.minecolonies.core.colony;
 import com.ldtteam.structurize.storage.StructurePacks;
 import com.ldtteam.structurize.storage.rendering.RenderingCache;
 import com.minecolonies.api.colony.*;
-import com.minecolonies.api.colony.buildingextensions.IBuildingExtension;
-import com.minecolonies.api.colony.buildings.registry.IBuildingDataManager;
+import com.minecolonies.api.colony.buildings.modules.ICommonSettingsModule;
+import com.minecolonies.api.colony.buildings.modules.settings.ISettingsModuleView;
+import com.minecolonies.api.colony.buildings.registry.BuildingEntry;
 import com.minecolonies.api.colony.buildings.views.IBuildingView;
 import com.minecolonies.api.colony.buildings.workerbuildings.ITownHallView;
 import com.minecolonies.api.colony.connections.IColonyConnectionManager;
 import com.minecolonies.api.colony.managers.interfaces.*;
+import com.minecolonies.api.colony.managers.interfaces.views.IRegisteredStructureManagerView;
 import com.minecolonies.api.colony.permissions.ColonyPlayer;
 import com.minecolonies.api.colony.permissions.IPermissions;
 import com.minecolonies.api.colony.requestsystem.StandardFactoryController;
@@ -27,12 +29,12 @@ import com.minecolonies.api.util.constant.Constants;
 import com.minecolonies.core.Network;
 import com.minecolonies.core.client.render.worldevent.ColonyBlueprintRenderer;
 import com.minecolonies.core.colony.buildings.modules.BuildingModules;
-import com.minecolonies.core.colony.buildings.views.AbstractBuildingView;
-import com.minecolonies.core.colony.buildings.workerbuildings.BuildingTownHall;
+import com.minecolonies.core.colony.buildings.modules.SettingsModule;
 import com.minecolonies.core.colony.managers.ColonyConnectionManager;
 import com.minecolonies.core.colony.managers.ResearchManager;
 import com.minecolonies.core.colony.managers.StatisticsManager;
 import com.minecolonies.core.colony.managers.TravellingManager;
+import com.minecolonies.core.colony.managers.views.RegisteredStructureManagerView;
 import com.minecolonies.core.colony.permissions.PermissionsView;
 import com.minecolonies.core.colony.requestsystem.management.manager.StandardRequestManager;
 import com.minecolonies.core.colony.workorders.AbstractWorkOrder;
@@ -50,6 +52,7 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.Level;
@@ -64,7 +67,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
-import java.util.function.Predicate;
 
 import static com.minecolonies.api.util.constant.NbtTagConstants.TAG_BANNER_PATTERNS;
 
@@ -87,16 +89,15 @@ public final class ColonyView implements IColonyView
     //  Administration/permissions
     @NotNull
     private final PermissionsView                permissions = new PermissionsView();
-    @NotNull
-    private final Map<BlockPos, IBuildingView>   buildings   = new HashMap<>();
-    @NotNull
-    private final Set<IBuildingExtension>        fields      = new HashSet<>();
+
     //  Citizenry
     @NotNull
     private final Map<Integer, ICitizenDataView> citizens = new HashMap<>();
     private final Map<Integer, IVisitorViewData> visitors = new HashMap<>();
     private       String                         name     = "Unknown";
     private       ResourceKey<Level>             dimensionId;
+    //  Colony Animals
+    private final Map<Integer, IAnimalDataView>  animals = new HashMap<>();
 
     /**
      * Colony team color.
@@ -112,10 +113,6 @@ public final class ColonyView implements IColonyView
 
     private BlockPos center = BlockPos.ZERO;
 
-    //  Buildings
-    @Nullable
-    private ITownHallView townHall;
-
     /**
      * The max citizen count.
      */
@@ -125,11 +122,6 @@ public final class ColonyView implements IColonyView
      * The max citizen count considering guard towers.
      */
     private int citizenCountWithEmptyGuardTowers = 0;
-
-    /**
-     * Check if the colony has a warehouse.
-     */
-    private boolean hasColonyWarehouse;
 
     /**
      * Last barbarian spawnpoints.
@@ -175,11 +167,6 @@ public final class ColonyView implements IColonyView
      * The world.
      */
     private Level world;
-
-    /**
-     * Print progress.
-     */
-    private boolean printProgress;
 
     /**
      * The last use time of the mercenaries.
@@ -243,9 +230,19 @@ public final class ColonyView implements IColonyView
     private final IColonyConnectionManager connectionManager = new ColonyConnectionManager(this);
 
     /**
+     * Client side structure manager.
+     */
+    private final IRegisteredStructureManagerView registeredStructureManagerView = new RegisteredStructureManagerView(this);
+
+    /**
      * Day in the colony.
      */
     private int day;
+
+    /**
+     * Colony level settings manager.
+     */
+    private final ISettingsModuleView settingsModule = (ISettingsModuleView) BuildingEntry.produceViewWithoutBuilding(BuildingModules.TOWNHALL_SETTINGS.key, this);
 
     /**
      * Base constructor for a colony.
@@ -304,7 +301,6 @@ public final class ColonyView implements IColonyView
             buf.writeBlockPos(block);
         }
         buf.writeDouble(colony.getOverallHappiness());
-        buf.writeBoolean(colony.hasWarehouse());
 
         buf.writeInt(waypoints.size());
         for (final Map.Entry<BlockPos, BlockState> block : waypoints.entrySet())
@@ -389,6 +385,7 @@ public final class ColonyView implements IColonyView
         buf.writeInt(colony.getDay());
         buf.writeNbt(colony.getTravellingManager().serializeNBT());
         colony.getConnectionManager().serializeToView(buf);
+        colony.getSettings().serializeToView(buf);
     }
 
     /**
@@ -474,17 +471,6 @@ public final class ColonyView implements IColonyView
         return dimensionId;
     }
 
-    /**
-     * Getter for the manual hiring or not.
-     *
-     * @return the boolean true or false.
-     */
-    @Override
-    public boolean isManualHiring()
-    {
-        return townHall != null && !townHall.getModuleView(BuildingModules.TOWNHALL_SETTINGS).getSetting(BuildingTownHall.AUTO_HIRING_MODE).getValue();
-    }
-
     @Override
     public CompoundTag write(final CompoundTag colonyCompound)
     {
@@ -497,17 +483,6 @@ public final class ColonyView implements IColonyView
         //Noop
     }
 
-    /**
-     * Getter for the manual housing or not.
-     *
-     * @return the boolean true or false.
-     */
-    @Override
-    public boolean isManualHousing()
-    {
-        return townHall != null && !townHall.getModuleView(BuildingModules.TOWNHALL_SETTINGS).getSetting(BuildingTownHall.AUTO_HOUSING_MODE).getValue();
-    }
-
     @Override
     public void addWayPoint(final BlockPos pos, final BlockState newWayPointState)
     {
@@ -518,17 +493,6 @@ public final class ColonyView implements IColonyView
     public boolean isValidAttackingGuard(final AbstractEntityCitizen entity)
     {
         return false;
-    }
-
-    /**
-     * Getter for letting citizens move in or not.
-     *
-     * @return the boolean true or false.
-     */
-    @Override
-    public boolean canMoveIn()
-    {
-        return townHall != null && !townHall.getModuleView(BuildingModules.TOWNHALL_SETTINGS).getSetting(BuildingTownHall.MOVE_IN).getValue();
     }
 
     /**
@@ -600,44 +564,6 @@ public final class ColonyView implements IColonyView
     public String getTextureStyleId()
     {
         return this.textureStyle;
-    }
-
-    /**
-     * Get the town hall View for this ColonyView.
-     *
-     * @return {@link BuildingTownHall.View} of the colony.
-     */
-    @Override
-    @Nullable
-    public ITownHallView getTownHall()
-    {
-        return townHall;
-    }
-
-    /**
-     * Get a AbstractBuilding.View for a given building (by coordinate-id) using raw x,y,z.
-     *
-     * @param x x-coordinate.
-     * @param y y-coordinate.
-     * @param z z-coordinate.
-     * @return {@link AbstractBuildingView} of a AbstractBuilding for the given Coordinates/ID, or null.
-     */
-    @Override
-    public IBuildingView getBuilding(final int x, final int y, final int z)
-    {
-        return getBuilding(new BlockPos(x, y, z));
-    }
-
-    /**
-     * Get a AbstractBuilding.View for a given building (by coordinate-id) using ChunkCoordinates.
-     *
-     * @param buildingId Coordinates/ID of the AbstractBuilding.
-     * @return {@link AbstractBuildingView} of a AbstractBuilding for the given Coordinates/ID, or null.
-     */
-    @Override
-    public IBuildingView getBuilding(final BlockPos buildingId)
-    {
-        return buildings.get(buildingId);
     }
 
     /**
@@ -739,8 +665,6 @@ public final class ColonyView implements IColonyView
         if (isNewSubscription)
         {
             citizens.clear();
-            townHall = null;
-            buildings.clear();
         }
 
         freePositions.clear();
@@ -761,7 +685,6 @@ public final class ColonyView implements IColonyView
             freePositions.add(buf.readBlockPos());
         }
         this.overallHappiness = buf.readDouble();
-        this.hasColonyWarehouse = buf.readBoolean();
 
         final int wayPointListSize = buf.readInt();
         for (int i = 0; i < wayPointListSize; i++)
@@ -828,6 +751,8 @@ public final class ColonyView implements IColonyView
         this.day = buf.readInt();
         this.travellingManager.deserializeNBT(buf.readNbt());
         this.connectionManager.deserializeFromView(buf);
+        this.registeredStructureManagerView.deserializeFromView(isNewSubscription, buf);
+        this.settingsModule.deserialize(buf);
         return null;
     }
 
@@ -929,6 +854,42 @@ public final class ColonyView implements IColonyView
         }
     }
 
+
+    /**
+     * Handles animal view messages
+     * @param animalBuf the new data to set
+     * @param refresh if all need to be refreshed
+     */
+    @Override
+    public void handleColonyViewAnimalMessage(final FriendlyByteBuf animalBuf, final boolean refresh)
+    {
+        final Map<Integer, IAnimalDataView> animalCache = new HashMap<>(animals);
+
+        Log.getLogger().info("ColonyView.handleColonyViewAnimalMessage");
+
+        if (refresh)
+        {
+            animals.clear();
+        }
+
+        int i = animalBuf.readInt();
+        for (int j = 0; j < i; j++)
+        {
+            final int id = animalBuf.readInt();
+            final IAnimalDataView dataView;
+            if (animalCache.containsKey(id))
+            {
+                dataView = animalCache.get(id);
+            }
+            else
+            {
+                dataView = new AnimalDataView(id, this);
+            }
+            dataView.deserialize(animalBuf);
+            animals.put(dataView.getId(), dataView);
+        }
+    }
+
     /**
      * Remove a citizen from the ColonyView.
      *
@@ -940,24 +901,6 @@ public final class ColonyView implements IColonyView
     public IMessage handleColonyViewRemoveCitizenMessage(final int citizen)
     {
         citizens.remove(citizen);
-        return null;
-    }
-
-    /**
-     * Remove a building from the ColonyView.
-     *
-     * @param buildingId location of the building.
-     * @return null == no response.
-     */
-    @Override
-    @Nullable
-    public IMessage handleColonyViewRemoveBuildingMessage(final BlockPos buildingId)
-    {
-        final IBuildingView building = buildings.remove(buildingId);
-        if (townHall == building)
-        {
-            townHall = null;
-        }
         return null;
     }
 
@@ -975,67 +918,10 @@ public final class ColonyView implements IColonyView
         return null;
     }
 
-    /**
-     * Update a ColonyView's buildings given a network data ColonyView update packet. This uses a full-replacement - buildings do not get updated and are instead overwritten.
-     *
-     * @param buildingId location of the building.
-     * @param buf        buffer containing ColonyBuilding information.
-     * @return null == no response.
-     */
-    @Override
-    @Nullable
-    public IMessage handleColonyBuildingViewMessage(final BlockPos buildingId, @NotNull final FriendlyByteBuf buf)
-    {
-        if (buildings.containsKey(buildingId))
-        {
-            //Read the string first to set up the buffer.
-            buf.readUtf(32767);
-            buildings.get(buildingId).deserialize(buf);
-        }
-        else
-        {
-            @Nullable final IBuildingView building = IBuildingDataManager.getInstance().createViewFrom(this, buildingId, buf);
-            if (building != null)
-            {
-                buildings.put(building.getID(), building);
-
-                if (building instanceof BuildingTownHall.View)
-                {
-                    townHall = (ITownHallView) building;
-                }
-            }
-        }
-
-        return null;
-    }
-
     @Override
     public void handleColonyViewResearchManagerUpdate(final CompoundTag compoundTag)
     {
         this.researchManager.readFromNBT(compoundTag);
-    }
-
-    @Override
-    public void handleColonyBuildingExtensionViewUpdateMessage(final Set<IBuildingExtension> extensions)
-    {
-        this.fields.clear();
-        this.fields.addAll(extensions);
-    }
-
-    @Override
-    public @NotNull List<IBuildingExtension> getBuildingExtensions(final Predicate<IBuildingExtension> matcher)
-    {
-        return fields.stream()
-            .filter(matcher)
-            .toList();
-    }
-
-    @Override
-    public @Nullable IBuildingExtension getBuildingExtension(final Predicate<IBuildingExtension> matcher)
-    {
-        return getBuildingExtensions(matcher).stream()
-            .findFirst()
-            .orElse(null);
     }
 
     /**
@@ -1134,12 +1020,6 @@ public final class ColonyView implements IColonyView
         return BlockPosUtil.getDistanceSquared2D(center, pos);
     }
 
-    @Override
-    public boolean hasTownHall()
-    {
-        return townHall != null;
-    }
-
     /**
      * Returns the ID of the view.
      *
@@ -1149,41 +1029,6 @@ public final class ColonyView implements IColonyView
     public int getID()
     {
         return id;
-    }
-
-    @Override
-    public boolean hasWarehouse()
-    {
-        return hasColonyWarehouse;
-    }
-
-    @Override
-    public boolean hasBuilding(final ResourceLocation name, final int level, final boolean singleBuilding)
-    {
-        int sum = 0;
-        for (final IBuildingView building : buildings.values())
-        {
-            if (building.getBuildingType().getRegistryName().equals(name))
-            {
-                if (singleBuilding)
-                {
-                    if (building.getBuildingLevel() >= level)
-                    {
-                        return true;
-                    }
-                }
-                else
-                {
-                    sum += building.getBuildingLevel();
-
-                    if (sum >= level)
-                    {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
     }
 
     @Override
@@ -1231,7 +1076,7 @@ public final class ColonyView implements IColonyView
     @Override
     public IRequester getRequesterBuildingForPosition(@NotNull final BlockPos pos)
     {
-        return getBuilding(pos);
+        return registeredStructureManagerView.getBuilding(pos);
     }
 
     @Override
@@ -1348,17 +1193,6 @@ public final class ColonyView implements IColonyView
         Network.getNetwork().sendToServer(new ColonyFlagChangeMessage(this, colonyFlag));
     }
 
-    /**
-     * Get a list of all buildings.
-     *
-     * @return a list of their views.
-     */
-    @Override
-    public List<IBuildingView> getBuildings()
-    {
-        return new ArrayList<>(buildings.values());
-    }
-
     @NotNull
     @Override
     public List<Player> getImportantMessageEntityPlayers()
@@ -1384,9 +1218,15 @@ public final class ColonyView implements IColonyView
     }
 
     @Override
-    public IRegisteredStructureManager getBuildingManager()
+    public IRegisteredStructureManager getServerBuildingManager()
     {
         return null;
+    }
+
+    @Override
+    public ICommonRegisteredStructureManager getCommonBuildingManager()
+    {
+        return registeredStructureManagerView;
     }
 
     @Override
@@ -1403,6 +1243,17 @@ public final class ColonyView implements IColonyView
 
     @Override
     public IVisitorManager getVisitorManager()
+    {
+        return null;
+    }
+
+    /**
+     * Gets the animal manager of the colony view.
+     *
+     * @return null in the view
+     */
+    @Override
+    public IAnimalManager getAnimalManager()
     {
         return null;
     }
@@ -1486,6 +1337,12 @@ public final class ColonyView implements IColonyView
     }
 
     @Override
+    public IAnimalDataView getAnimal(final int animalId)
+    {
+        return animals.get(animalId);
+    }
+
+    @Override
     public void setNameStyle(final String style)
     {
         this.nameStyle = style;
@@ -1526,5 +1383,17 @@ public final class ColonyView implements IColonyView
     public IQuestManager getQuestManager()
     {
         return this.questManager;
+    }
+
+    @Override
+    public IRegisteredStructureManagerView getClientBuildingManager()
+    {
+        return registeredStructureManagerView;
+    }
+
+    @Override
+    public ICommonSettingsModule getSettings()
+    {
+        return settingsModule;
     }
 }

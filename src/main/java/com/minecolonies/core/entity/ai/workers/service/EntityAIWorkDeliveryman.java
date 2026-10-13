@@ -163,7 +163,7 @@ public class EntityAIWorkDeliveryman extends AbstractEntityAIInteract<JobDeliver
         worker.getCitizenData().setVisibleStatus(DELIVERING);
 
         final BlockPos pickupTarget = currentTask.getRequester().getLocation().getInDimensionLocation();
-        final IBuilding pickupBuilding = building.getColony().getBuildingManager().getBuilding(pickupTarget);
+        final IBuilding pickupBuilding = building.getColony().getServerBuildingManager().getBuilding(pickupTarget);
         if (pickupBuilding == null)
         {
             job.finishRequest(false);
@@ -181,6 +181,9 @@ public class EntityAIWorkDeliveryman extends AbstractEntityAIInteract<JobDeliver
             this.currentSlot = 0;
             job.finishRequest(true);
             StatsUtil.trackStatByName(this.building, PICKUPS_MADE, pickupBuilding.getBuildingDisplayName(), 1);
+
+            worker.decreaseSaturationForContinuousAction();
+            worker.getCitizenExperienceHandler().addExperience(0.05D);
 
             if (currentTask.getRequest().getPriority() >= PRIORITY_FORCING_DUMP)
             {
@@ -253,10 +256,6 @@ public class EntityAIWorkDeliveryman extends AbstractEntityAIInteract<JobDeliver
         final ItemStack activeStack = handler.extractItem(currentSlot, amount, false);
         InventoryUtils.transferItemStackIntoNextBestSlotInItemHandler(activeStack, worker.getInventoryCitizen());
         targetBuilding.markDirty();
-        worker.decreaseSaturationForContinuousAction();
-
-        // The worker gets a little bit of exp for every itemstack he grabs.
-        worker.getCitizenExperienceHandler().addExperience(0.01D);
         CitizenItemUtils.setHeldItem(worker, InteractionHand.MAIN_HAND, SLOT_HAND);
 
         return false;
@@ -350,7 +349,7 @@ public class EntityAIWorkDeliveryman extends AbstractEntityAIInteract<JobDeliver
             return START_WORKING;
         }
 
-        final IBuilding targetBuilding = worker.getCitizenColonyHandler().getColony().getBuildingManager().getBuilding(targetBuildingLocation.getInDimensionLocation());
+        final IBuilding targetBuilding = worker.getCitizenColonyHandler().getColony().getServerBuildingManager().getBuilding(targetBuildingLocation.getInDimensionLocation());
         if (targetBuilding == null)
         {
             job.finishRequest(true);
@@ -423,7 +422,7 @@ public class EntityAIWorkDeliveryman extends AbstractEntityAIInteract<JobDeliver
                           .triggerInteraction(new PosBasedInteraction(Component.translatable(COM_MINECOLONIES_COREMOD_JOB_DELIVERYMAN_NAMEDCHESTFULL,
                             targetBuilding.getFirstModuleOccurance(WorkerBuildingModule.class).getFirstCitizen().getName()),
                             ChatPriority.IMPORTANT,
-                            Component.translatable(COM_MINECOLONIES_COREMOD_JOB_DELIVERYMAN_CHESTFULL),
+                            Component.translatable(COM_MINECOLONIES_COREMOD_JOB_DELIVERYMAN_NAMEDCHESTFULL),
                             targetBuilding.getID()));
                     }
                     else

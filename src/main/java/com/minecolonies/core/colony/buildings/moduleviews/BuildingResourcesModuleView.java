@@ -3,7 +3,7 @@ package com.minecolonies.core.colony.buildings.moduleviews;
 import com.ldtteam.blockui.views.BOWindow;
 import com.minecolonies.api.colony.buildings.modules.AbstractBuildingModuleView;
 import com.minecolonies.api.util.constant.Constants;
-import com.minecolonies.core.client.gui.modules.WindowBuilderResModule;
+import com.minecolonies.core.client.gui.modules.building.WindowBuilderResModule;
 import com.minecolonies.core.colony.buildings.utils.BuildingBuilderResource;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
@@ -136,6 +136,6 @@ public class BuildingResourcesModuleView extends AbstractBuildingModuleView
     @Override
     public Component getDesc()
     {
-        return Component.literal("com.minecolonies.coremod.gui.workerhuts.resourcelist");
+        return Component.translatable("com.minecolonies.coremod.gui.workerhuts.resourcelist");
     }
 }

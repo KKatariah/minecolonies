@@ -1,7 +1,6 @@
 package com.minecolonies.core.entity.ai.workers;
 
 import com.ldtteam.structurize.blocks.schematic.BlockFluidSubstitution;
-import com.ldtteam.structurize.blueprints.v1.Blueprint;
 import com.ldtteam.structurize.placement.BlockPlacementResult;
 import com.ldtteam.structurize.placement.StructurePhasePlacementResult;
 import com.ldtteam.structurize.placement.StructurePlacer;
@@ -44,7 +43,6 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.AABB;
 import net.minecraftforge.common.util.TriPredicate;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -114,7 +112,7 @@ public abstract class AbstractEntityAIStructure<J extends AbstractJobStructure<?
 
         return worldState.getBlock() instanceof IBuilderUndestroyable
                  || worldState.getBlock() == Blocks.BEDROCK
-                 || (info.getBlockInfo().getState().getBlock() instanceof AbstractBlockHut && handler.getWorldPos().equals(worldPos)
+                 || (info.getBlockInfo().getState().getBlock() instanceof AbstractBlockHut && handler.getCenterPos().equals(worldPos)
                        && worldState.getBlock() instanceof AbstractBlockHut);
     };
 
@@ -173,7 +171,11 @@ public abstract class AbstractEntityAIStructure<J extends AbstractJobStructure<?
           /*
            * Check if we have to build something.
            */
-          new AITarget(IDLE, this::isThereAStructureToBuild, () -> START_BUILDING, 10),
+          new AITarget(IDLE, START_WORKING, 10),
+          /*
+           * Start working at the building.
+           */
+          new AITarget(START_WORKING, this::startWorkingAtOwnBuilding, TICKS_SECOND),
           /*
            * Build the structure and foundation of the building.
            */
@@ -184,6 +186,19 @@ public abstract class AbstractEntityAIStructure<J extends AbstractJobStructure<?
           new AITarget(COMPLETE_BUILD, this::completeBuild, STANDARD_DELAY),
           new AITarget(PICK_UP, this::pickUpMaterial, 5)
         );
+    }
+
+    /**
+     * Start working at own building. Override for worker specific implementations.
+     * @return next state.
+     */
+    protected IAIState startWorkingAtOwnBuilding()
+    {
+        if (isThereAStructureToBuild())
+        {
+            return START_BUILDING;
+        }
+        return IDLE;
     }
 
     /**
@@ -627,6 +642,11 @@ public abstract class AbstractEntityAIStructure<J extends AbstractJobStructure<?
             return BUILDING_STEP;
         }
 
+        if (structurePlacer == null)
+        {
+            return IDLE;
+        }
+
         final BlockState worldState = world.getBlockState(blockToMine);
         if (worldState.getBlock() instanceof AirBlock || worldState.getBlock() == Blocks.WATER)
         {
@@ -668,7 +688,7 @@ public abstract class AbstractEntityAIStructure<J extends AbstractJobStructure<?
             }
 
             final BuildingStructureHandler<J, B> structure;
-            IBuilding colonyBuilding = worker.getCitizenColonyHandler().getColonyOrRegister().getBuildingManager().getBuilding(position);
+            IBuilding colonyBuilding = worker.getCitizenColonyHandler().getColonyOrRegister().getServerBuildingManager().getBuilding(position);
             final BlockEntity entity = world.getBlockEntity(position);
 
             if (removal)

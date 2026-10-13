@@ -5,12 +5,11 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.reflect.TypeToken;
 import com.minecolonies.api.colony.ICitizenData;
 import com.minecolonies.api.colony.IColony;
-import com.minecolonies.api.colony.buildings.modules.IBuildingModule;
 import com.minecolonies.api.colony.buildings.modules.settings.ISetting;
 import com.minecolonies.api.colony.buildings.modules.settings.ISettingKey;
 import com.minecolonies.api.colony.buildings.registry.BuildingEntry;
 import com.minecolonies.api.colony.jobs.registry.JobEntry;
-import com.minecolonies.api.colony.modules.IModuleContainer;
+import com.minecolonies.api.colony.modules.IBuildingModuleContainer;
 import com.minecolonies.api.colony.requestsystem.request.IRequest;
 import com.minecolonies.api.colony.requestsystem.requestable.IDeliverable;
 import com.minecolonies.api.colony.requestsystem.requestable.IRequestable;
@@ -19,6 +18,9 @@ import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolver;
 import com.minecolonies.api.colony.requestsystem.resolver.IRequestResolverProvider;
 import com.minecolonies.api.colony.requestsystem.token.IToken;
 import com.minecolonies.api.crafting.ItemStorage;
+import com.minecolonies.api.inventory.api.CombinedItemHandler;
+import com.minecolonies.core.util.SortingUtils;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.util.Tuple;
@@ -37,7 +39,7 @@ import static com.minecolonies.api.util.constant.EquipmentLevelConstants.BASIC_T
 import static com.minecolonies.api.util.constant.EquipmentLevelConstants.TOOL_LEVEL_MAXIMUM;
 import static com.minecolonies.api.util.constant.Suppression.GENERIC_WILDCARD;
 
-public interface IBuilding extends IBuildingContainer, IModuleContainer<IBuildingModule>, IRequestResolverProvider, IRequester, ISchematicProvider
+public interface IBuilding extends IBuildingContainer, IBuildingModuleContainer, IRequestResolverProvider, IRequester, ICommonBuilding
 {
     /**
      * Minimal level to ask for wood tools. (WOOD_HUT_LEVEL + 1 == stone)
@@ -113,12 +115,6 @@ public interface IBuilding extends IBuildingContainer, IModuleContainer<IBuildin
     void destroy();
 
     void onDestroyed();
-
-    /**
-     * Get the colony from a building.
-     * @return the colony it belongs to.
-     */
-    IColony getColony();
 
     /**
      * Method to define if a builder can build this although the builder is not level 1 yet.
@@ -422,13 +418,6 @@ public interface IBuilding extends IBuildingContainer, IModuleContainer<IBuildin
     void pickUp(final Player player);
 
     /**
-     * Get the Building type
-     *
-     * @return building type
-     */
-    BuildingEntry getBuildingType();
-
-    /**
      * Set the building type
      *
      * @param buildingType
@@ -523,4 +512,23 @@ public interface IBuilding extends IBuildingContainer, IModuleContainer<IBuildin
      */
     @NotNull
     List<BlockPos> getLocationsFromTag(@NotNull final String tagName);
+
+    /**
+     * Checks if the building can be sorted.
+     * @return true if the building can be sorted, false otherwise.
+     */
+    default public boolean canSort()
+    {
+        return false;
+    }
+
+    /**
+     * Sort the inventory of this building using the given provider.
+     * The implementation of this method is usually a call to {@link SortingUtils#sort(CombinedItemHandler)}.
+     * @param inventoryHandler the inventory handler to sort.
+     */
+    default public void sort(final CombinedItemHandler inventoryHandler)
+    {
+        SortingUtils.sort(inventoryHandler);
+    }
 }
